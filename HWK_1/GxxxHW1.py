@@ -58,55 +58,6 @@ def exactOutliers(listOfPoints, D, M, K):
         print(tuple[0])
 
 
-def cell_identifier(point, cell_side_length):
-    i = int(point[0] // cell_side_length)
-    j = int(point[1] // cell_side_length)
-    return (i, j)
-
-def count_points_in_cell(iterator, cell_side_length):
-    counts = {}
-    for point in iterator:
-        cell = cell_identifier(point, cell_side_length)
-        counts[cell] = counts.get(cell, 0) + 1
-    return counts.items()
-
-def count_neighbors(cell, cell_counts):
-    i, j = cell
-    neighbors_count = 0
-    for x in range(i-1, i+2):
-        for y in range(j-1, j+2):
-            neighbors_count += cell_counts.get((x, y), 0)
-    return neighbors_count
-
-def MRApproxOutliers(points_rdd, D, M, K):
-    cell_side_length = D / (2 * 2**0.5)
-    cell_counts = points_rdd.mapPartitions(count_points_in_cell) \
-                            .reduceByKey(lambda x, y: x + y)
-    
-    cell_N3_N7 = cell_counts.map(lambda cell_count: (cell_count[0], cell_count[1], 
-                                                      count_neighbors(cell_count[0], cell_counts)))
-    
-    # Filter sure outliers, uncertain points, and get smallest cells
-    sure_outliers = cell_N3_N7.filter(lambda cell: cell[2] <= M).map(lambda cell: cell[0]).collect()
-    uncertain_points = cell_N3_N7.filter(lambda cell: cell[1] > M and cell[2] > M).count()
-    smallest_cells = cell_N3_N7.takeOrdered(K, key=lambda x: x[1])
-
-    # Print results
-    print("Sure (D, M)-outliers:", sure_outliers)
-    print("Uncertain points:", uncertain_points)
-    print("Smallest non-empty cells (identifier, size):", smallest_cells)
-
-if __name__ == "__main__":
-    sc = SparkContext("local", "MRApproxOutliers")
-    points_rdd = sc.parallelize([(1.0, 2.0), (3.0, 4.0), (5.0, 6.0), (7.0, 8.0), (9.0, 10.0)])
-    D = 10.0
-    M = 2
-    K = 3
-    MRApproxOutliers(points_rdd, D, M, K)
-    sc.stop()
-
-
-
 #TEST
 #supposed output should be (3, 3) (5, 5) (0, 0), one per line
 points = [(0, 0), (0, 1), (1, 0), (3, 3), (4, 4), (5, 5)]
