@@ -63,7 +63,7 @@ def cell_identifier(point, cell_side_length):
     j = int(point[1] // cell_side_length)
     return (i, j)
 
-def count_points_in_cell(iterator):
+def count_points_in_cell(iterator, cell_side_length):
     counts = {}
     for point in iterator:
         cell = cell_identifier(point, cell_side_length)
@@ -79,29 +79,23 @@ def count_neighbors(cell, cell_counts):
     return neighbors_count
 
 def MRApproxOutliers(points_rdd, D, M, K):
-    # Step A: Count points in each cell
     cell_side_length = D / (2 * 2**0.5)
     cell_counts = points_rdd.mapPartitions(count_points_in_cell) \
                             .reduceByKey(lambda x, y: x + y)
     
-    # Step B: Attach N3 and N7 to each non-empty cell
     cell_N3_N7 = cell_counts.map(lambda cell_count: (cell_count[0], cell_count[1], 
                                                       count_neighbors(cell_count[0], cell_counts)))
     
-    # Collect small cell counts in local memory
-    cell_N3_N7_local = cell_N3_N7.collect()
-
-    # Compute sure outliers, uncertain points, and K smallest cells
-    sure_outliers = cell_N3_N7.filter(lambda cell: cell[2] <= M).count()
+    # Filter sure outliers, uncertain points, and get smallest cells
+    sure_outliers = cell_N3_N7.filter(lambda cell: cell[2] <= M).map(lambda cell: cell[0]).collect()
     uncertain_points = cell_N3_N7.filter(lambda cell: cell[1] > M and cell[2] > M).count()
-    smallest_cells = sorted(cell_N3_N7_local, key=lambda x: x[1])[:K]
+    smallest_cells = cell_N3_N7.takeOrdered(K, key=lambda x: x[1])
 
     # Print results
     print("Sure (D, M)-outliers:", sure_outliers)
     print("Uncertain points:", uncertain_points)
     print("Smallest non-empty cells (identifier, size):", smallest_cells)
 
-# Example usage
 if __name__ == "__main__":
     sc = SparkContext("local", "MRApproxOutliers")
     points_rdd = sc.parallelize([(1.0, 2.0), (3.0, 4.0), (5.0, 6.0), (7.0, 8.0), (9.0, 10.0)])
@@ -110,6 +104,7 @@ if __name__ == "__main__":
     K = 3
     MRApproxOutliers(points_rdd, D, M, K)
     sc.stop()
+
 
 
 #TEST
