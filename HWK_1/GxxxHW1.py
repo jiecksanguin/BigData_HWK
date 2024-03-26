@@ -57,6 +57,47 @@ def exactOutliers(listOfPoints, D, M, K):
     for tuple in sortedOutliers[:K]:
         print(tuple[0])
 
+def MRApproxOutliers(inputPoints, D, M, K):
+    # Step A: Transform input RDD into RDD of cells with their counts
+    def map_to_cells(point):
+        x, y = point
+        cell_i = int(x / (D / (2**0.5)))
+        cell_j = int(y / (D / (2**0.5)))
+        return ((cell_i, cell_j), 1)
+    
+    def add_counts(count1, count2):
+        return count1 + count2
+    
+    cells_with_counts = inputPoints.map(map_to_cells).reduceByKey(add_counts)
+    
+    # Step B: Transform RDD of cells to include N3 and N7 counts
+    def map_to_cell_info(cell_with_count):
+        (cell_i, cell_j), count = cell_with_count
+        N3 = cells_with_counts.filter(lambda x: abs(x[0][0] - cell_i) <= 1 and abs(x[0][1] - cell_j) <= 1).map(lambda x: x[1]).sum()
+        N7 = cells_with_counts.filter(lambda x: abs(x[0][0] - cell_i) <= 3 and abs(x[0][1] - cell_j) <= 3).map(lambda x: x[1]).sum()
+        return ((cell_i, cell_j), (count, N3, N7))
+    
+    cells_with_info = cells_with_counts.map(map_to_cell_info)
+    
+    # Count sure outliers, uncertain points, and find top K non-empty cells
+    sure_outliers_count = cells_with_info.filter(lambda x: x[1][1] > M).count()
+    uncertain_points_count = cells_with_info.filter(lambda x: x[1][1] <= M and x[1][2] > M).count()
+    top_cells = cells_with_info.sortBy(lambda x: x[1][0], ascending=False).take(K)
+    
+    return sure_outliers_count, uncertain_points_count, top_cells
+
+# Example usage:
+if __name__ == "__main__":
+    sc = SparkContext("local", "MRApproxOutliers")
+    inputPoints = sc.parallelize([(1.0, 2.0), (3.0, 4.0), (5.0, 6.0), (7.0, 8.0)])
+    D = 1.0
+    M = 2
+    K = 3
+    sure_outliers_count, uncertain_points_count, top_cells = MRApproxOutliers(inputPoints, D, M, K)
+    
+    print("Sure outliers count:", sure_outliers_count)
+    print("Uncertain points count:", uncertain_points_count)
+    print("Top cells:", top_cells)
 
 #TEST
 #supposed output should be (3, 3) (5, 5) (0, 0), one per line
