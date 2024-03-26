@@ -1,4 +1,5 @@
 import math 
+from pyspark import SparkContext
 """
 Let 𝑆 be a set of 𝑁 points from some metric space and, for each 𝑝∈𝑆 let 𝐵𝑆(𝑝,𝑟) denote the set of points of 𝑆 at distance 
 at most 𝑟 from 𝑝. For given parameters 𝑀,𝐷>0, an (𝑀,𝐷) -outlier (w.r.t. 𝑆) is a point 𝑝∈𝑆 such that |𝐵𝑆(𝑝,𝐷)|≤𝑀. 
@@ -55,6 +56,61 @@ def exactOutliers(listOfPoints, D, M, K):
     # Print only the first K outliers, one per line
     for tuple in sortedOutliers[:K]:
         print(tuple[0])
+
+
+def cell_identifier(point, cell_side_length):
+    i = int(point[0] // cell_side_length)
+    j = int(point[1] // cell_side_length)
+    return (i, j)
+
+def count_points_in_cell(iterator):
+    counts = {}
+    for point in iterator:
+        cell = cell_identifier(point, cell_side_length)
+        counts[cell] = counts.get(cell, 0) + 1
+    return counts.items()
+
+def count_neighbors(cell, cell_counts):
+    i, j = cell
+    neighbors_count = 0
+    for x in range(i-1, i+2):
+        for y in range(j-1, j+2):
+            neighbors_count += cell_counts.get((x, y), 0)
+    return neighbors_count
+
+def MRApproxOutliers(points_rdd, D, M, K):
+    # Step A: Count points in each cell
+    cell_side_length = D / (2 * 2**0.5)
+    cell_counts = points_rdd.mapPartitions(count_points_in_cell) \
+                            .reduceByKey(lambda x, y: x + y)
+    
+    # Step B: Attach N3 and N7 to each non-empty cell
+    cell_N3_N7 = cell_counts.map(lambda cell_count: (cell_count[0], cell_count[1], 
+                                                      count_neighbors(cell_count[0], cell_counts)))
+    
+    # Collect small cell counts in local memory
+    cell_N3_N7_local = cell_N3_N7.collect()
+
+    # Compute sure outliers, uncertain points, and K smallest cells
+    sure_outliers = cell_N3_N7.filter(lambda cell: cell[2] <= M).count()
+    uncertain_points = cell_N3_N7.filter(lambda cell: cell[1] > M and cell[2] > M).count()
+    smallest_cells = sorted(cell_N3_N7_local, key=lambda x: x[1])[:K]
+
+    # Print results
+    print("Sure (D, M)-outliers:", sure_outliers)
+    print("Uncertain points:", uncertain_points)
+    print("Smallest non-empty cells (identifier, size):", smallest_cells)
+
+# Example usage
+if __name__ == "__main__":
+    sc = SparkContext("local", "MRApproxOutliers")
+    points_rdd = sc.parallelize([(1.0, 2.0), (3.0, 4.0), (5.0, 6.0), (7.0, 8.0), (9.0, 10.0)])
+    D = 10.0
+    M = 2
+    K = 3
+    MRApproxOutliers(points_rdd, D, M, K)
+    sc.stop()
+
 
 #TEST
 #supposed output should be (3, 3) (5, 5) (0, 0), one per line
