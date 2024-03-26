@@ -80,7 +80,8 @@ def MRApproxOutliers(inputPoints, D, M, K):
     cells_with_info = cells_with_counts.map(map_to_cell_info)
     
     # Count sure outliers, uncertain points, and find top K non-empty cells
-    sure_outliers_count = cells_with_info.filter(lambda x: x[1][1] > M).count()
+    cells_info_collected = cells_with_info.collect()
+    sure_outliers_count = len([cell_info for cell_info in cells_info_collected if cell_info[1][1] > M])
     uncertain_points_count = cells_with_info.filter(lambda x: x[1][1] <= M and x[1][2] > M).count()
     top_cells = cells_with_info.sortBy(lambda x: x[1][0], ascending=False).take(K)
     
