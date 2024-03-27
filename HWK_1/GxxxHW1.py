@@ -1,14 +1,16 @@
+
 import math 
 from pyspark import SparkContext, SparkConf
 import sys
 import time
-"""
+
+'''
 Let 𝑆 be a set of 𝑁 points from some metric space and, for each 𝑝∈𝑆 let 𝐵𝑆(𝑝,𝑟) denote the set of points of 𝑆 at distance 
 at most 𝑟 from 𝑝. For given parameters 𝑀,𝐷>0, an (𝑀,𝐷) -outlier (w.r.t. 𝑆) is a point 𝑝∈𝑆 such that |𝐵𝑆(𝑝,𝐷)|≤𝑀. 
 The problem that we want to study is the following: given 𝑆,𝑀, and 𝐷, mark each point 𝑝∈𝑆 as outlier, if it is an 
 (𝑀,𝐷)-outlier, and non-outlier otherwise.
+'''
 
-"""
 def exactOutliers(listOfPoints, D, M, K):
     
     #check that all the values taken as argument are of the correct type
@@ -21,34 +23,36 @@ def exactOutliers(listOfPoints, D, M, K):
     if not isinstance(K, int):
         raise TypeError("K must be a float")
     
-    #compute all the pairwise distances
     #complexity: O(𝑁(𝑁−1)/2)
-    distances = {}
-    for i in range(len(listOfPoints)):
-        for j in range(i+1,len(listOfPoints)):
-            p1 = listOfPoints[i]
-            p2 = listOfPoints[j]
-            distance = math.dist(p1, p2)
-            distances[(i,j)] = distance
-
+    
+    # Initialize an empty list to store outliers
     outliers = []
-    for i, point in enumerate(listOfPoints):
-        counter = 1
-        p1 = listOfPoints[i]
-        for j, other_point in enumerate(listOfPoints):
-            if i != j:  # Exclude distance to itself
-                if (i, j) in distances:
-                    distance = distances[(i, j)]
-                elif (j, i) in distances:
-                    distance = distances[(j, i)]
-                else:
-                    raise ValueError(f"No distance found between {point} and {other_point}")
 
+    # Initialize a counter list with all elements set to 1,
+    # indicating each point has at least one neighbor (itself)
+    counter = [1] * len(listOfPoints)
+    # Loop through each pair of points to calculate distances and update the counter
+    for i in range(len(listOfPoints)):
+        for j in range(i+1, len(listOfPoints)):
+            # Check if the points are distinct
+            if i != j:
+                # Get the coordinates of the two points
+                p1 = listOfPoints[i]
+                p2 = listOfPoints[j]
+                # Calculate the Euclidean distance between the points
+                distance = math.dist(p1, p2)
+                # If the distance is less than or equal to D
+                # increment the counter for both points
                 if distance <= D:
-                    counter += 1
+                    counter[i] += 1
+                    counter[j] += 1
 
-        if counter <= M:
-            outliers.append((p1, counter))
+    # Iterate over the indices and counts in the counter list
+    for i, count in enumerate(counter):
+        # Check if the count is less than or equal to M
+        if count <= M:
+            # If so, add the point and its count to the outliers list
+            outliers.append((listOfPoints[i], count))
 
     #print the total number of outliers
     print("Printing the total number of outliers:", len(outliers))
