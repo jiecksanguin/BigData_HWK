@@ -1,5 +1,7 @@
 import math 
-from pyspark import SparkContext
+from pyspark import SparkContext, SparkConf
+import sys
+import time
 """
 Let 𝑆 be a set of 𝑁 points from some metric space and, for each 𝑝∈𝑆 let 𝐵𝑆(𝑝,𝑟) denote the set of points of 𝑆 at distance 
 at most 𝑟 from 𝑝. For given parameters 𝑀,𝐷>0, an (𝑀,𝐷) -outlier (w.r.t. 𝑆) is a point 𝑝∈𝑆 such that |𝐵𝑆(𝑝,𝐷)|≤𝑀. 
@@ -31,7 +33,7 @@ def exactOutliers(listOfPoints, D, M, K):
 
     outliers = []
     for i, point in enumerate(listOfPoints):
-        counter = 0
+        counter = 1
         p1 = listOfPoints[i]
         for j, other_point in enumerate(listOfPoints):
             if i != j:  # Exclude distance to itself
@@ -48,20 +50,101 @@ def exactOutliers(listOfPoints, D, M, K):
         if counter <= M:
             outliers.append((p1, counter))
 
-    #print(outliers)
-    #sort the outliers list so that it will have the outlier points in non-decreasing order of |𝐵𝑆(𝑝,𝐷)|
-    sortedOutliers = sorted(outliers, key=lambda x: x[1], reverse=False)
+    #print the total number of outliers
+    print("Printing the total number of outliers:", len(outliers))
 
-    #print(sortedOutliers)
+    # Sort the outliers list so that it will have the outlier points in non-decreasing order of |𝐵𝑆(𝑝,𝐷)|
+    sortedOutliers = sorted(outliers, key=lambda x: x[1])
+
     # Print only the first K outliers, one per line
-    for tuple in sortedOutliers[:K]:
-        print(tuple[0])
+    for point, _ in sortedOutliers[:K]:
+        print("Point:", point)
 
-#TEST
-#supposed output should be (3, 3) (5, 5) (0, 0), one per line
-points = [(0, 0), (0, 1), (1, 0), (3, 3), (4, 4), (5, 5)]
-D = 2.5
-M = 2
-K = 3
-exactOutliers(points, D, M, K) 
 
+if __name__ == "__main__":
+    # Check if the correct number of command-line arguments are provided
+    if len(sys.argv) != 6:
+        print("Usage: python test_exact_outliers.py <path_to_file> <D> <M> <K> <L>")
+        sys.exit(1)
+
+    # Extract command-line arguments
+    path_to_file = sys.argv[1]
+    D = float(sys.argv[2])
+    M = int(sys.argv[3])
+    K = int(sys.argv[4])
+    L = int(sys.argv[5])
+
+    print("Command-line arguments:")
+    print("Path to file:", path_to_file)
+    print("D:", D)
+    print("M:", M)
+    print("K:", K)
+    print("L:", L)
+
+    # Initialize SparkContext
+    sc = SparkContext(appName="ExactOutliers")
+
+    # Read input points into an RDD of strings (rawData)
+    rawData = sc.textFile(path_to_file)
+
+    # Transform rawData into an RDD of points (inputPoints), represented as pairs of floats
+    inputPoints = rawData.map(lambda line: [float(x) for x in line.strip().split(',')])
+
+    # Repartition inputPoints into L partitions
+    inputPoints = inputPoints.repartition(L)
+
+    # Print the total number of points
+    total_points = inputPoints.count()
+    print("Total number of points:", total_points)
+
+    # Check if the number of points is at most 200000
+    if total_points <= 200000:
+        # Download the points into a list called listOfPoints
+        listOfPoints = inputPoints.collect()
+
+        # Execute ExactOutliers with parameters listOfPoints, D, M, and K
+        start_time = time.time()
+        exactOutliers(listOfPoints, D, M, K)
+        end_time = time.time()
+        print("ExactOutliers running time:", end_time - start_time)
+
+    # Stop SparkContext
+    sc.stop()
+
+'''
+if __name__ == "__main__":
+    # Check if the correct number of command-line arguments are provided
+    if len(sys.argv) != 6:
+        print("Usage: python test_exact_outliers.py <path_to_file> <D> <M> <K> <L>")
+        sys.exit(1)
+
+    # Extract command-line arguments
+    path_to_file = sys.argv[1]
+    D = float(sys.argv[2])
+    M = int(sys.argv[3])
+    K = int(sys.argv[4])
+    L = int(sys.argv[5])
+
+    print("Command-line arguments:")
+    print("Path to file:", path_to_file)
+    print("D:", D)
+    print("M:", M)
+    print("K:", K)
+    print("L:", L)
+
+    # Read points from file
+    listOfPoints = []
+    with open(path_to_file, 'r') as file:
+        for line in file:
+            # Assuming each line contains space-separated coordinates
+            coordinates = list(map(float, line.strip().split(',')))
+            listOfPoints.append(coordinates)
+
+    print("Total number of points:", len(listOfPoints))
+
+    # Execute ExactOutliers
+    start_time = time.time()
+    exactOutliers(listOfPoints, D, M, K)
+    end_time = time.time()
+    print("ExactOutliers running time:", end_time - start_time)
+'''
