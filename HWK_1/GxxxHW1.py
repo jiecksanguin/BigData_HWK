@@ -32,12 +32,13 @@ def exactOutliers(listOfPoints, D, M, K):
     # indicating each point has at least one neighbor (itself)
     counter = [1] * len(listOfPoints)
     # Loop through each pair of points to calculate distances and update the counter
-    for i in range(len(listOfPoints)):
+    for i in range(len(listOfPoints)-1):
+        # Get the coordinates of the first point
+        p1 = listOfPoints[i]
         for j in range(i+1, len(listOfPoints)):
             # Check if the points are distinct
             if i != j:
-                # Get the coordinates of the two points
-                p1 = listOfPoints[i]
+                # Get the coordinates of the second point
                 p2 = listOfPoints[j]
                 # Calculate the Euclidean distance between the points
                 distance = math.dist(p1, p2)
