@@ -4,6 +4,7 @@ from pyspark import SparkContext, SparkConf
 import sys
 import time
 
+
 '''
 Let 𝑆 be a set of 𝑁 points from some metric space and, for each 𝑝∈𝑆 let 𝐵𝑆(𝑝,𝑟) denote the set of points of 𝑆 at distance 
 at most 𝑟 from 𝑝. For given parameters 𝑀,𝐷>0, an (𝑀,𝐷) -outlier (w.r.t. 𝑆) is a point 𝑝∈𝑆 such that |𝐵𝑆(𝑝,𝐷)|≤𝑀. 
@@ -64,6 +65,36 @@ def exactOutliers(listOfPoints, D, M, K):
     # Print only the first K outliers, one per line
     for point, _ in sortedOutliers[:K]:
         print("Point:", point)
+
+    
+def getCell(point, cellSideLength):
+    i = math.floor(point[0] / cellSideLength)
+    j = math.floor(point[1] / cellSideLength)
+    return (i, j)
+
+def gatherPairsPartitions(pairs):
+    pairs_dict = {}
+    for p in pairs:
+        if p not in pairs_dict.keys():
+            pairs_dict[p] = 1
+        else:
+            pairs_dict[p] += 1
+    return [(key, pairs_dict[key]) for key in pairs_dict.keys()]
+
+
+def MRApproxOutliers(points, D, M, K):
+    # STEP A
+    mapped_points1 = points.map(lambda x: getCell(x, D/(2 * math.sqrt(2)))) # Round 1
+    mapped_points2 = mapped_points1.mapPartitions(gatherPairsPartitions)
+    
+    #2 possibilities:
+    #mapped_points3 = mapped_points2.groupByKey()
+    #mapped_points4 = mapped_points3.mapValues(lambda vals: sum(vals)).cache()    
+                   
+    mapped_points3 = mapped_points2.reduceByKey(lambda a, b: a + b)
+    mapped_points4 = mapped_points3.cache()
+
+    # Step B 
 
 
 if __name__ == "__main__":
