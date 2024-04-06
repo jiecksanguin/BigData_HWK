@@ -82,7 +82,7 @@ def gatherPairsPartitions(pairs):
 
 def calculate_N3_N7(cell_sizes, cellSideLength):
     N3_N7_results = []
-    for cell, size in cell_sizes:
+    for cell, size in cell_sizes.items():
         i, j = cell
         N3 = 0
         N7 = 0
@@ -102,7 +102,7 @@ def calculate_N3_N7(cell_sizes, cellSideLength):
 
 def MRApproxOutliers(points, D, M, K):
     
-    cellSideLength = D/(math.sqrt(2))
+    cellSideLength = D/(2 * math.sqrt(2))
     
     # STEP A
     mapped_points = (points.map(lambda x: getCell(x,cellSideLength)) 
@@ -114,14 +114,14 @@ def MRApproxOutliers(points, D, M, K):
     #.groupByKey()
     #.mapValues(lambda vals: sum(vals)).cache()  
     
-    cell_sizes = mapped_points.collect()
+    cell_sizes = mapped_points.collectAsMap()
     # Step B 
     
     N3_N7_results = calculate_N3_N7(cell_sizes, cellSideLength)
     
     # Calculate the number of sure outliers, uncertain points
     sure_outliers_count = sum(1 for cell, N3, _ in N3_N7_results if N3 > M)
-    uncertain_points_count = sum(1 for _, N3, N7 in N3_N7_results if N3 <= M and N7 > M)
+    uncertain_points_count = sum(1 for cell, N3, N7 in N3_N7_results if N3 <= M and N7 > M)
     smallest_cells = sorted(N3_N7_results, key=lambda x: x[1])[:K]
     
     # Print the K smallest non-empty cells
