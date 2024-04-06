@@ -1,4 +1,3 @@
-
 import math 
 from pyspark import SparkContext, SparkConf
 import sys
@@ -81,20 +80,56 @@ def gatherPairsPartitions(pairs):
             pairs_dict[p] += 1
     return [(key, pairs_dict[key]) for key in pairs_dict.keys()]
 
+def calculate_N3_N7(cell_sizes, cellSideLength):
+    N3_N7_results = []
+    for cell, size in cell_sizes:
+        i, j = cell
+        N3 = 0
+        N7 = 0
+        # Iterate over a 7x7 grid around the cell
+        for di in range(-3, 4):
+            for dj in range(-3, 4):
+                ni = i + di
+                nj = j + dj
+                if (ni, nj) in cell_sizes:
+                    cell_size = cell_sizes[(ni, nj)]
+                    if abs(di) <= 1 and abs(dj) <= 1:
+                        N3 += cell_size
+                    N7 += cell_size
+        N3_N7_results.append((cell, N3, N7))
+    return N3_N7_results
+
 
 def MRApproxOutliers(points, D, M, K):
-    # STEP A
-    mapped_points1 = points.map(lambda x: getCell(x, D/(2 * math.sqrt(2)))) # Round 1
-    mapped_points2 = mapped_points1.mapPartitions(gatherPairsPartitions)
     
-    #2 possibilities:
-    #mapped_points3 = mapped_points2.groupByKey()
-    #mapped_points4 = mapped_points3.mapValues(lambda vals: sum(vals)).cache()    
-                   
-    mapped_points3 = mapped_points2.reduceByKey(lambda a, b: a + b)
-    mapped_points4 = mapped_points3.cache()
+    cellSideLength = D/(math.sqrt(2))
+    
+    # STEP A
+    mapped_points = (points.map(lambda x: getCell(x,cellSideLength)) 
+        .mapPartitions(gatherPairsPartitions) 
+        .reduceByKey(lambda a, b: a + b) 
+        .cache())
 
+    #2 possibilities:
+    #.groupByKey()
+    #.mapValues(lambda vals: sum(vals)).cache()  
+    
+    cell_sizes = mapped_points.collect()
     # Step B 
+    
+    N3_N7_results = calculate_N3_N7(cell_sizes, cellSideLength)
+    
+    # Calculate the number of sure outliers, uncertain points
+    sure_outliers_count = sum(1 for cell, N3, _ in N3_N7_results if N3 > M)
+    uncertain_points_count = sum(1 for _, N3, N7 in N3_N7_results if N3 <= M and N7 > M)
+    smallest_cells = sorted(N3_N7_results, key=lambda x: x[1])[:K]
+    
+    # Print the K smallest non-empty cells
+    print("Number of sure (D, M)-outliers:", sure_outliers_count)
+    print("Number of uncertain points:", uncertain_points_count)
+    print("K smallest non-empty cells:")
+    for cell, N3, N7 in smallest_cells:
+        print("Cell:", cell, "Size:", cell_sizes[cell])
 
 
 if __name__ == "__main__":
@@ -118,7 +153,7 @@ if __name__ == "__main__":
     print("L:", L)
 
     # Initialize SparkContext
-    sc = SparkContext(appName="ExactOutliers")
+    sc = SparkContext(appName="Outliers")
 
     # Read input points into an RDD of strings (rawData)
     rawData = sc.textFile(path_to_file)
@@ -144,5 +179,11 @@ if __name__ == "__main__":
         end_time = time.time()
         print("ExactOutliers running time:", end_time - start_time)
 
+    start_time_approx = time.time()
+    MRApproxOutliers(inputPoints, D, M, K)
+    end_time_approx = time.time()
+    print("MRApproxOutliers running time:", end_time_approx - start_time_approx, "seconds")
+
+    
     # Stop SparkContext
     sc.stop()
