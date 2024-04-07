@@ -21,7 +21,7 @@ def exactOutliers(listOfPoints, D, M, K):
     if not isinstance(M, int):
         raise TypeError("M must be an integer")
     if not isinstance(K, int):
-        raise TypeError("K must be a float")
+        raise TypeError("K must be a integer")
     
     #complexity: O(𝑁(𝑁−1)/2)
     
@@ -97,6 +97,7 @@ def calculate_N3_N7(cell_sizes, cellSideLength):
                         N3 += cell_size
                     N7 += cell_size
         N3_N7_results.append((cell, N3, N7))
+        print("Cell:", cell, "N3:", N3, "N7:", N7)
     return N3_N7_results
 
 
