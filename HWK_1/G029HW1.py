@@ -80,7 +80,7 @@ def gatherPairsPartitions(pairs):
             pairs_dict[p] += 1
     return [(key, pairs_dict[key]) for key in pairs_dict.keys()]
 
-def calculate_N3_N7(cell_sizes, cellSideLength):
+def calculate_N3_N7(cell_sizes):
     N3_N7_results = []
     for cell, size in cell_sizes.items():
         i, j = cell
@@ -110,7 +110,7 @@ def MRApproxOutliers(points, D, M, K):
         .mapPartitions(gatherPairsPartitions) 
         .reduceByKey(lambda a, b: a + b) 
         .cache())
-
+    print(mapped_points)
     #2 possibilities:
     #.groupByKey()
     #.mapValues(lambda vals: sum(vals)).cache()  
@@ -118,7 +118,7 @@ def MRApproxOutliers(points, D, M, K):
     cell_sizes = mapped_points.collectAsMap()
     # Step B 
     
-    N3_N7_results = calculate_N3_N7(cell_sizes, cellSideLength)
+    N3_N7_results = calculate_N3_N7(cell_sizes)
     
     # Calculate the number of sure outliers, uncertain points
     sure_outliers_count = sum(1 for cell, N3, _ in N3_N7_results if N3 > M)
