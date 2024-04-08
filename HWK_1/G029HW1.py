@@ -94,34 +94,30 @@ def calculate_N3_N7(cell_sizes):
                 if (ni, nj) in cell_sizes:
                     cell_size = cell_sizes[(ni, nj)]
                     if abs(di) <= 1 and abs(dj) <= 1:
-                        N3 += cell_size
+                            N3 += cell_size
                     N7 += cell_size
         N3_N7_results.append((cell, N3, N7))
-        print("Cell:", cell, "N3:", N3, "N7:", N7)
     return N3_N7_results
-
 
 def MRApproxOutliers(points, D, M, K):
     
     cellSideLength = D/(2 * math.sqrt(2))
-    
+    print(cellSideLength)
     # STEP A
     mapped_points = (points.map(lambda x: getCell(x,cellSideLength)) 
         .mapPartitions(gatherPairsPartitions) 
         .reduceByKey(lambda a, b: a + b) 
         .cache())
-    print(mapped_points)
     #2 possibilities:
     #.groupByKey()
-    #.mapValues(lambda vals: sum(vals)).cache()  
-    
+    #.mapValues(lambda vals: sum(vals)).cache()   
     cell_sizes = mapped_points.collectAsMap()
-    # Step B 
     
+    # Step B 
     N3_N7_results = calculate_N3_N7(cell_sizes)
     
     # Calculate the number of sure outliers, uncertain points
-    sure_outliers_count = sum(1 for cell, N3, _ in N3_N7_results if N3 > M)
+    sure_outliers_count = sum(1 for cell, _ , N7 in N3_N7_results if N7 <= M)
     uncertain_points_count = sum(1 for cell, N3, N7 in N3_N7_results if N3 <= M and N7 > M)
     smallest_cells = sorted(N3_N7_results, key=lambda x: x[1])[:K]
     
