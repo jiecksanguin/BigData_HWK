@@ -70,28 +70,24 @@ def gatherPairsPartitions(pairs):
             pairs_dict[p] += 1
     return [(key, pairs_dict[key]) for key in pairs_dict.keys()]
 
-def calculateN3N7(cellSizes, M):
-    outliers = []
-    uncertainOutliers = []
+def calculateN3N7(cellSizes):
+    N3_N7_results = []
     for cell, size in cellSizes.items():
-        x,y = cell
+        i, j = cell
         N3 = 0
         N7 = 0
-        for i in range(-3, 4):
-            for j in range(-3, 4):
-                px = x + i
-                py = y + j
-                if (px, py) in cellSizes:
-                    count = cellSizes[(px, py)]
-                    if abs(i) <= 1 and abs(j) <= 1:
-                            N3 += count
-                    N7 += count
-        if N7 <= M:
-            outliers.append((cell, cellSizes[cell]))
-        if N3 <= M and N7 > M:
-            uncertainOutliers.append((cell, cellSizes[cell]))
-
-    return outliers, uncertainOutliers
+        # Iterate over a 7x7 grid around the cell
+        for di in range(-3, 4):
+            for dj in range(-3, 4):
+                ni = i + di
+                nj = j + dj
+                if (ni, nj) in cellSizes:
+                    cell_size = cellSizes[(ni, nj)]
+                    if abs(di) <= 1 and abs(dj) <= 1:
+                            N3 += cell_size
+                    N7 += cell_size
+        N3_N7_results.append((cell, N3, N7, cellSizes[cell]))
+    return N3_N7_results
 
 
 def MRApproxOutliers(points, D, M, K):
@@ -111,12 +107,19 @@ def MRApproxOutliers(points, D, M, K):
 
     cellSizes = mapped_points.collectAsMap()
 
-    sureOutliers, uncertainPoints = calculateN3N7(cellSizes, M)
-    print(f"Number of sure outliers = {sum([cell[1] for cell in sureOutliers])}")
-    print(f"Number of uncertain outliers = {sum([cell[1] for cell in uncertainPoints])}")
-    smallestCells = sorted(sureOutliers, key = lambda x: x[1])[:K]
-    for cell in smallestCells:
-        print(f"Cell: {cell[0]}  Size = {cell[1]}")
+    N3_N7_results = calculateN3N7(cellSizes)
+    
+    # Calculate the number of sure outliers, uncertain points
+    sure_outliers_count = sum(size for cell, N3 , N7, size in N3_N7_results if N7 <= M)
+    uncertain_points_count = sum(size for cell, N3, N7, size in N3_N7_results if N3 <= M and N7 > M)
+    smallest_cells = sorted(N3_N7_results, key=lambda x: x[1])[:K]
+    
+    # Print the K smallest non-empty cells
+    print("Number of sure (D, M)-outliers:", sure_outliers_count)
+    print("Number of uncertain points:", uncertain_points_count)
+    print("K smallest non-empty cells:")
+    for cell, N3, N7, size in smallest_cells:
+        print("Cell:", cell, "Size:", cellSizes[cell])
 
 
 if __name__ == "__main__":
