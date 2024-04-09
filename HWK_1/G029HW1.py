@@ -46,14 +46,15 @@ def exactOutliers(listOfPoints, D, M, K):
             outliers.append((listOfPoints[i], count))
 
     #print the total number of outliers
-    print("Printing the total number of outliers:", len(outliers))
+    print("Number of Outliers =", len(outliers))
 
     # Sort the outliers list so that it will have the outlier points in non-decreasing order of |𝐵𝑆(𝑝,𝐷)|
     sortedOutliers = sorted(outliers, key=lambda x: x[1])
 
     # Print only the first K outliers, one per line
     for point, _ in sortedOutliers[:K]:
-        print("Point:", point)
+        print("Point:", f"({point[0]}, {point[1]})")
+
 
     
 def getCell(point, cellSideLength):
@@ -93,7 +94,6 @@ def calculateN3N7(cellSizes):
 def MRApproxOutliers(points, D, M, K):
     
     cellSideLength = D/(2 * math.sqrt(2))
-    print(cellSideLength)
     # STEP A
     mapped_points = (points.map(lambda x: getCell(x,cellSideLength)) 
         .mapPartitions(gatherPairsPartitions) 
@@ -115,11 +115,10 @@ def MRApproxOutliers(points, D, M, K):
     smallest_cells = sorted(N3_N7_results, key=lambda x: x[1])[:K]
     
     # Print the K smallest non-empty cells
-    print("Number of sure (D, M)-outliers:", sure_outliers_count)
-    print("Number of uncertain points:", uncertain_points_count)
-    print("K smallest non-empty cells:")
+    print("Number of sure outliers=", sure_outliers_count)
+    print("Number of uncertain points=", uncertain_points_count)
     for cell, N3, N7, size in smallest_cells:
-        print("Cell:", cell, "Size:", cellSizes[cell])
+        print("Cell:", cell, "Size =", cellSizes[cell])
 
 
 if __name__ == "__main__":
@@ -134,13 +133,8 @@ if __name__ == "__main__":
     M = int(sys.argv[3])
     K = int(sys.argv[4])
     L = int(sys.argv[5])
-
-    print("Command-line arguments:")
-    print("Path to file:", path_to_file)
-    print("D:", D)
-    print("M:", M)
-    print("K:", K)
-    print("L:", L)
+    
+    print(f"{path_to_file} D={D} M={M} K={K} L={L}")
 
     # Initialize SparkContext
     sc = SparkContext(appName="Outliers")
@@ -156,7 +150,7 @@ if __name__ == "__main__":
 
     # Print the total number of points
     total_points = inputPoints.count()
-    print("Total number of points:", total_points)
+    print("Number of points =", total_points)
 
     # Check if the number of points is at most 200000
     if total_points <= 200000:
@@ -164,15 +158,17 @@ if __name__ == "__main__":
         listOfPoints = inputPoints.collect()
 
         # Execute ExactOutliers with parameters listOfPoints, D, M, and K
-        start_time = time.time()
+        start_time_exact = time.time()
         exactOutliers(listOfPoints, D, M, K)
-        end_time = time.time()
-        print("ExactOutliers running time:", end_time - start_time)
+        end_time_exact = time.time()
+        milliseconds_exact = (end_time_exact - start_time_exact) * 1000
+        print("Running time of ExactOutliers =", milliseconds_exact, "ms")
 
     start_time_approx = time.time()
     MRApproxOutliers(inputPoints, D, M, K)
     end_time_approx = time.time()
-    print("MRApproxOutliers running time:", end_time_approx - start_time_approx, "seconds")
+    milliseconds_approx = (end_time_approx - start_time_approx) * 1000
+    print("Running time of MRApproxOutliers =", milliseconds_approx, "ms")
 
     
     # Stop SparkContext
