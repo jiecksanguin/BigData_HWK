@@ -4,14 +4,7 @@ import sys
 import time
 
 
-'''
-Let 𝑆 be a set of 𝑁 points from some metric space and, for each 𝑝∈𝑆 let 𝐵𝑆(𝑝,𝑟) denote the set of points of 𝑆 at distance 
-at most 𝑟 from 𝑝. For given parameters 𝑀,𝐷>0, an (𝑀,𝐷) -outlier (w.r.t. 𝑆) is a point 𝑝∈𝑆 such that |𝐵𝑆(𝑝,𝐷)|≤𝑀. 
-The problem that we want to study is the following: given 𝑆,𝑀, and 𝐷, mark each point 𝑝∈𝑆 as outlier, if it is an 
-(𝑀,𝐷)-outlier, and non-outlier otherwise.
-'''
-
-def exactOutliers(listOfPoints, D, M, K):
+def exactOutliers(list_of_points, D, M, K):
     
     #complexity: O(𝑁(𝑁−1)/2)
     
@@ -20,16 +13,16 @@ def exactOutliers(listOfPoints, D, M, K):
 
     # Initialize a counter list with all elements set to 1,
     # indicating each point has at least one neighbor (itself)
-    counter = [1] * len(listOfPoints)
+    counter = [1] * len(list_of_points)
     # Loop through each pair of points to calculate distances and update the counter
-    for i in range(len(listOfPoints)-1):
+    for i in range(len(list_of_points)-1):
         # Get the coordinates of the first point
-        p1 = listOfPoints[i]
-        for j in range(i+1, len(listOfPoints)):
+        p1 = list_of_points[i]
+        for j in range(i+1, len(list_of_points)):
             # Check if the points are distinct
             if i != j:
                 # Get the coordinates of the second point
-                p2 = listOfPoints[j]
+                p2 = list_of_points[j]
                 # Calculate the Euclidean distance between the points
                 distance = math.dist(p1, p2)
                 # If the distance is less than or equal to D
@@ -43,26 +36,25 @@ def exactOutliers(listOfPoints, D, M, K):
         # Check if the count is less than or equal to M
         if count <= M:
             # If so, add the point and its count to the outliers list
-            outliers.append((listOfPoints[i], count))
+            outliers.append((list_of_points[i], count))
 
     #print the total number of outliers
     print("Number of Outliers =", len(outliers))
 
     # Sort the outliers list so that it will have the outlier points in non-decreasing order of |𝐵𝑆(𝑝,𝐷)|
-    sortedOutliers = sorted(outliers, key=lambda x: x[1])
+    sorted_outliers = sorted(outliers, key=lambda x: x[1])
 
     # Print only the first K outliers, one per line
-    for point, _ in sortedOutliers[:K]:
+    for point, _ in sorted_outliers[:K]:
         print("Point:", f"({point[0]}, {point[1]})")
 
-
     
-def getCell(point, cellSideLength):
-    i = math.floor(point[0] / cellSideLength)
-    j = math.floor(point[1] / cellSideLength)
+def get_cell(point, cell_side_length):
+    i = math.floor(point[0] / cell_side_length)
+    j = math.floor(point[1] / cell_side_length)
     return (i, j)
 
-def gatherPairsPartitions(pairs):
+def gather_pairs_partitions(pairs):
     pairs_dict = {}
     for p in pairs:
         if p not in pairs_dict.keys():
@@ -71,9 +63,9 @@ def gatherPairsPartitions(pairs):
             pairs_dict[p] += 1
     return [(key, pairs_dict[key]) for key in pairs_dict.keys()]
 
-def calculateN3N7(cellSizes):
+def calculate_N3_N7(cell_sizes):
     N3_N7_results = []
-    for cell, size in cellSizes.items():
+    for cell, size in cell_sizes.items():
         i, j = cell
         N3 = 0
         N7 = 0
@@ -82,33 +74,29 @@ def calculateN3N7(cellSizes):
             for dj in range(-3, 4):
                 ni = i + di
                 nj = j + dj
-                if (ni, nj) in cellSizes:
-                    cell_size = cellSizes[(ni, nj)]
+                if (ni, nj) in cell_sizes:
+                    cell_size = cell_sizes[(ni, nj)]
                     if abs(di) <= 1 and abs(dj) <= 1:
                             N3 += cell_size
                     N7 += cell_size
-        N3_N7_results.append((cell, N3, N7, cellSizes[cell]))
+        N3_N7_results.append((cell, N3, N7, cell_sizes[cell]))
     return N3_N7_results
 
 
 def MRApproxOutliers(points, D, M, K):
     
-    cellSideLength = D/(2 * math.sqrt(2))
+    cell_side_length = D/(2 * math.sqrt(2))
+
     # STEP A
-    mapped_points = (points.map(lambda x: getCell(x,cellSideLength)) 
-        .mapPartitions(gatherPairsPartitions) 
+    mapped_points = (points.map(lambda x: get_cell(x,cell_side_length)) 
+        .mapPartitions(gather_pairs_partitions) 
         .reduceByKey(lambda a, b: a + b) 
         .cache())
     
-    #2 possibilities:
-    #.groupByKey()
-    #.mapValues(lambda vals: sum(vals)).cache()   
-    
-
+    #STEP B
     cellSizes = mapped_points.collectAsMap()
+    N3_N7_results = calculate_N3_N7(cellSizes)
 
-    N3_N7_results = calculateN3N7(cellSizes)
-    
     # Calculate the number of sure outliers, uncertain points
     sure_outliers_count = sum(size for cell, N3 , N7, size in N3_N7_results if N7 <= M)
     uncertain_points_count = sum(size for cell, N3, N7, size in N3_N7_results if N3 <= M and N7 > M)
@@ -133,39 +121,39 @@ if __name__ == "__main__":
     M = int(sys.argv[3])
     K = int(sys.argv[4])
     L = int(sys.argv[5])
-    
+
     print(f"{path_to_file} D={D} M={M} K={K} L={L}")
 
     # Initialize SparkContext
     sc = SparkContext(appName="Outliers")
 
     # Read input points into an RDD of strings (rawData)
-    rawData = sc.textFile(path_to_file)
+    raw_data = sc.textFile(path_to_file)
 
     # Transform rawData into an RDD of points (inputPoints), represented as pairs of floats
-    inputPoints = rawData.map(lambda line: [float(x) for x in line.strip().split(',')])
+    input_points = raw_data.map(lambda line: [float(x) for x in line.strip().split(',')])
 
     # Repartition inputPoints into L partitions
-    inputPoints = inputPoints.repartition(L)
+    input_points = input_points.repartition(L)
 
     # Print the total number of points
-    total_points = inputPoints.count()
+    total_points = input_points.count()
     print("Number of points =", total_points)
 
     # Check if the number of points is at most 200000
     if total_points <= 200000:
         # Download the points into a list called listOfPoints
-        listOfPoints = inputPoints.collect()
+        list_of_points = input_points.collect()
 
         # Execute ExactOutliers with parameters listOfPoints, D, M, and K
         start_time_exact = time.time()
-        exactOutliers(listOfPoints, D, M, K)
+        exactOutliers(list_of_points, D, M, K)
         end_time_exact = time.time()
         milliseconds_exact = (end_time_exact - start_time_exact) * 1000
         print("Running time of ExactOutliers =", milliseconds_exact, "ms")
 
     start_time_approx = time.time()
-    MRApproxOutliers(inputPoints, D, M, K)
+    MRApproxOutliers(input_points, D, M, K)
     end_time_approx = time.time()
     milliseconds_approx = (end_time_approx - start_time_approx) * 1000
     print("Running time of MRApproxOutliers =", milliseconds_approx, "ms")
