@@ -50,20 +50,26 @@ def exactOutliers(list_of_points, D, M, K):
 
     
 def get_cell(point, cell_side_length):
+    # Calculate the cell coordinates (i, j) for a given point
+    # by dividing its coordinates by the cell side length
     i = math.floor(point[0] / cell_side_length)
     j = math.floor(point[1] / cell_side_length)
     return (i, j)
 
+
 def gather_pairs_partitions(pairs):
+    # Create a dictionary to count occurrences of each pair
     pairs_dict = {}
     for p in pairs:
         if p not in pairs_dict.keys():
             pairs_dict[p] = 1
         else:
             pairs_dict[p] += 1
+    # Convert the dictionary to a list of key-value pairs
     return [(key, pairs_dict[key]) for key in pairs_dict.keys()]
 
 def calculate_N3_N7(cell_sizes):
+    # Calculate the N3 and N7 metrics for each cell based on neighboring cells
     N3_N7_results = []
     for cell, size in cell_sizes.items():
         i, j = cell
@@ -74,26 +80,31 @@ def calculate_N3_N7(cell_sizes):
             for dj in range(-3, 4):
                 ni = i + di
                 nj = j + dj
+                # Check if the neighboring cell exists in cell_sizes
                 if (ni, nj) in cell_sizes:
                     cell_size = cell_sizes[(ni, nj)]
+                    # Update N3 if the neighboring cell is within 1 unit distance
                     if abs(di) <= 1 and abs(dj) <= 1:
                             N3 += cell_size
+                    # Always update N7 for any neighboring cell
                     N7 += cell_size
+        # Append the computed N3, N7, and cell size to the results
         N3_N7_results.append((cell, N3, N7, cell_sizes[cell]))
     return N3_N7_results
 
 
 def MRApproxOutliers(points, D, M, K):
     
+    # Calculate the cell side length for grid-based processing
     cell_side_length = D/(2 * math.sqrt(2))
 
-    # STEP A
+    # STEP A: Map each point to a cell, gather and count pairs within each partition
     mapped_points = (points.map(lambda x: get_cell(x,cell_side_length)) 
         .mapPartitions(gather_pairs_partitions) 
         .reduceByKey(lambda a, b: a + b) 
         .cache())
     
-    #STEP B
+    #STEP B: Collect cell sizes as a map and calculate N3/N7 metrics
     cellSizes = mapped_points.collectAsMap()
     N3_N7_results = calculate_N3_N7(cellSizes)
 
