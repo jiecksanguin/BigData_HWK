@@ -139,32 +139,32 @@ if __name__ == "__main__":
     sc = SparkContext(appName="Outliers")
 
     # Read input points into an RDD of strings (rawData)
-    raw_data = sc.textFile(path_to_file)
+    rawData = sc.textFile(path_to_file)
 
     # Transform rawData into an RDD of points (inputPoints), represented as pairs of floats
-    input_points = raw_data.map(lambda line: [float(x) for x in line.strip().split(',')])
+    inputPoints = rawData.map(lambda line: [float(x) for x in line.strip().split(',')])
 
     # Repartition inputPoints into L partitions
-    input_points = input_points.repartition(L)
+    inputPoints = inputPoints.repartition(L)
 
     # Print the total number of points
-    total_points = input_points.count()
+    total_points = inputPoints.count()
     print("Number of points =", total_points)
 
     # Check if the number of points is at most 200000
     if total_points <= 200000:
         # Download the points into a list called listOfPoints
-        list_of_points = input_points.collect()
+        listOfPoints = inputPoints.collect()
 
         # Execute ExactOutliers with parameters listOfPoints, D, M, and K
         start_time_exact = time.time()
-        exactOutliers(list_of_points, D, M, K)
+        exactOutliers(listOfPoints, D, M, K)
         end_time_exact = time.time()
         milliseconds_exact = (end_time_exact - start_time_exact) * 1000
         print("Running time of ExactOutliers =", milliseconds_exact, "ms")
 
     start_time_approx = time.time()
-    MRApproxOutliers(input_points, D, M, K)
+    MRApproxOutliers(inputPoints, D, M, K)
     end_time_approx = time.time()
     milliseconds_approx = (end_time_approx - start_time_approx) * 1000
     print("Running time of MRApproxOutliers =", milliseconds_approx, "ms")
