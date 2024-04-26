@@ -111,7 +111,7 @@ def MRApproxOutliers(points, D, M, K):
     # Calculate the number of sure outliers, uncertain points
     sure_outliers_count = sum(size for cell, N3 , N7, size in N3_N7_results if N7 <= M)
     uncertain_points_count = sum(size for cell, N3, N7, size in N3_N7_results if N3 <= M and N7 > M)
-    smallest_cells = sorted(N3_N7_results, key=lambda x: x[1])[:K]
+    smallest_cells = sorted(N3_N7_results, key=lambda x: x[3])[:K]
     
     # Print the K smallest non-empty cells
     print("Number of sure outliers=", sure_outliers_count)
