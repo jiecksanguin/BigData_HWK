@@ -109,8 +109,10 @@ def MRFFT(inputPoints, K):
 
 def MRApproxOutliers(points, D, M):
 
+    cell_side_length = D/(2 * math.sqrt(2))
+
     # STEP A: Map each point to a cell, gather and count pairs within each partition
-    mapped_points = (points.map(lambda x: get_cell(x,D)) 
+    mapped_points = (points.map(lambda x: get_cell(x,cell_side_length)) 
         .mapPartitions(gather_pairs_partitions) 
         .reduceByKey(lambda a, b: a + b) 
         .cache())
@@ -159,6 +161,8 @@ if __name__ == "__main__":
 
     # Execute MRFFT to get the radius
     D = MRFFT(inputPoints, K)
+    
+    print("Radius =", D)
     
     start_time_approx = time.time()
     MRApproxOutliers(inputPoints, D, M)
