@@ -59,17 +59,18 @@ def SequentialFFT(P, K):
     distance_dict = {}
     for point in PP:
         distance_dict[tuple(point)] = math.dist(point, farthest_point)
-
+    del distance_dict[tuple(farthest_point)]
     while len(C) < K:
         next_center = max(distance_dict.keys(), key=lambda x: distance_dict[x])
 
-        for point in PP:
+        for point in distance_dict.keys():
             current_distance = math.dist(point, next_center)
             if current_distance < distance_dict[tuple(point)]:
                 distance_dict[tuple(point)] = current_distance
         C.append(next_center)
+        del distance_dict[tuple(next_center)]
         #PP.remove(next_center)
-    return C
+    return C 
 
 def MRFFT(inputPoints, K):
     # Round 1: MR-FarthestFirstTraversal
