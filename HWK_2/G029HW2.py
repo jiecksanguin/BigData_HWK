@@ -82,7 +82,7 @@ def SequentialFFT(P, K):
 def MRFFT(inputPoints, K):
     # Round 1: MR-FarthestFirstTraversal
     start_time_round1 = time.time()
-    coreset = inputPoints.takeSample(False, K, 1)
+    coreset= inputPoints.mapPartitions(lambda partition: [SequentialFFT(list(partition), K)]).flatMap(lambda x: x).collect()
     end_time_round1 = time.time()
     milliseconds_round1 = (end_time_round1 - start_time_round1) * 1000
     print("Running time of Round 1 =", milliseconds_round1, "ms")
