@@ -50,34 +50,26 @@ def calculate_N3_N7(cell_sizes):
 def SequentialFFT(P, K):
     # Initialize an empty list to store the centers
     C = []
-    
+    PP = P[:]
     # Choose an arbitrary point from P as the first center
     farthest_point = P[0]
     C.append(farthest_point)
-    
-    # Repeat until the number of centers is K
-    while len(C) < K:
-        # Initialize max_distance to -1
-        max_distance = -1
-        next_center = None
-        
-        # Iterate over each point in P
-        for point in P:
-            # Compute the minimum distance from the current point to all existing centers in C
-            min_distance = min([math.dist(point, c) for c in C])
-            
-            # If the minimum distance is greater than the current max_distance
-            if min_distance > max_distance:
-                # Update max_distance and set the current point as the next_center
-                max_distance = min_distance
-                next_center = point
-        
-        # Append the next_center (farthest point from existing centers) to C
-        C.append(next_center)
-    
-    # Return the list of centers
-    return C
+    #PP.remove(farthest_point)
 
+    distance_dict = {}
+    for point in PP:
+        distance_dict[tuple(point)] = math.dist(point, farthest_point)
+
+    while len(C) < K:
+        next_center = max(distance_dict.keys(), key=lambda x: distance_dict[x])
+
+        for point in PP:
+            current_distance = math.dist(point, next_center)
+            if current_distance < distance_dict[tuple(point)]:
+                distance_dict[tuple(point)] = current_distance
+        C.append(next_center)
+        #PP.remove(next_center)
+    return C
 
 def MRFFT(inputPoints, K):
     # Round 1: MR-FarthestFirstTraversal
