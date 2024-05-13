@@ -48,34 +48,40 @@ def calculate_N3_N7(cell_sizes):
     return N3_N7_results
 
 def SequentialFFT(P, K):
+
     # Initialize an empty list to store the centers
     C = []
-    PP = P[:]
     # Choose an arbitrary point from P as the first center
-    farthest_point = P[0]
+    farthest_point= P[0]
     C.append(farthest_point)
-    #PP.remove(farthest_point)
 
-    distance_dict = {}
-    for point in PP:
-        distance_dict[tuple(point)] = math.dist(point, farthest_point)
+    # Initialize distance dictionary
+    distance_dict = dict((tuple(point), -1) for point in P)
     del distance_dict[tuple(farthest_point)]
+
     while len(C) < K:
-        next_center = max(distance_dict.keys(), key=lambda x: distance_dict[x])
+        max_min_distance = -1
+        next_center = None
 
         for point in distance_dict.keys():
-            current_distance = math.dist(point, next_center)
-            if current_distance < distance_dict[tuple(point)]:
+            current_distance = math.dist(point, farthest_point)  # Use the first center as reference
+            distance_before = distance_dict[tuple(point)]
+            if current_distance < distance_before or distance_before == -1:
                 distance_dict[tuple(point)] = current_distance
+                distance_before = current_distance
+            if distance_before > max_min_distance:
+                max_min_distance = distance_before
+                next_center = point
+        farthest_point = next_center
         C.append(next_center)
-        del distance_dict[tuple(next_center)]
-        #PP.remove(next_center)
-    return C 
+        del distance_dict[tuple(farthest_point)]
+
+    return C
 
 def MRFFT(inputPoints, K):
     # Round 1: MR-FarthestFirstTraversal
     start_time_round1 = time.time()
-    coreset= inputPoints.mapPartitions(lambda partition: [SequentialFFT(list(partition), K)]).flatMap(lambda x: x).collect()
+    coreset= inputPoints.mapPartitions(lambda partition: [SequentialFFT(list(partition), K)]).flatMap(lambda x: x).cache().collect()
     end_time_round1 = time.time()
     milliseconds_round1 = (end_time_round1 - start_time_round1) * 1000
     print("Running time of Round 1 =", milliseconds_round1, "ms")
@@ -146,7 +152,7 @@ if __name__ == "__main__":
     inputPoints = rawData.map(lambda line: [float(x) for x in line.strip().split(',')])
 
     # Repartition inputPoints into L partitions
-    inputPoints = inputPoints.repartition(L)
+    inputPoints = inputPoints.repartition(L).cache()
 
     # Print the total number of points
     total_points = inputPoints.count()
@@ -165,4 +171,4 @@ if __name__ == "__main__":
 
     
     # Stop SparkContext
-    sc.stop()
+    sc.stop() 
