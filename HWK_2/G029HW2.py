@@ -81,7 +81,7 @@ def SequentialFFT(P, K):
 def MRFFT(inputPoints, K):
     # Round 1: MR-FarthestFirstTraversal
     start_time_round1 = time.time()
-    coreset= inputPoints.mapPartitions(lambda partition: [SequentialFFT(list(partition), K)]).flatMap(lambda x: x).cache().collect()
+    coreset= inputPoints.mapPartitions(lambda partition: [SequentialFFT(list(partition), K)]).flatMap(lambda x: x).collect()
     end_time_round1 = time.time()
     milliseconds_round1 = (end_time_round1 - start_time_round1) * 1000
     print("Running time of Round 1 =", milliseconds_round1, "ms")
@@ -95,10 +95,10 @@ def MRFFT(inputPoints, K):
 
     # Broadcast centers for Round 3
     centers_broadcast = sc.broadcast(centers)
-    
+    centers_value = centers_broadcast.value
     # Round 3: Compute radius R
     start_time_round3 = time.time()
-    R = inputPoints.map(lambda x: min([math.dist(x, c) for c in centers_broadcast.value])).reduce(max)
+    R = inputPoints.map(lambda x: min([math.dist(x, c) for c in centers_value])).reduce(max)
     end_time_round3 = time.time()
     milliseconds_round3 = (end_time_round3 - start_time_round3) * 1000
     print("Running time of Round 3 =", milliseconds_round3, "ms")
@@ -152,7 +152,7 @@ if __name__ == "__main__":
     inputPoints = rawData.map(lambda line: [float(x) for x in line.strip().split(',')])
 
     # Repartition inputPoints into L partitions
-    inputPoints = inputPoints.repartition(L).cache()
+    inputPoints = inputPoints.repartition(L)
 
     # Print the total number of points
     total_points = inputPoints.count()
