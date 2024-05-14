@@ -84,14 +84,14 @@ def MRFFT(inputPoints, K):
     coreset= inputPoints.mapPartitions(lambda partition: [SequentialFFT(list(partition), K)]).flatMap(lambda x: x).collect()
     end_time_round1 = time.time()
     milliseconds_round1 = (end_time_round1 - start_time_round1) * 1000
-    print("Running time of Round 1 =", milliseconds_round1, "ms")
+    print("Running time of MRFFT Round 1 =", milliseconds_round1, "ms")
 
     # Round 2: SequentialFFT on coreset
     start_time_round2 = time.time()
     centers = SequentialFFT(coreset, K)
     end_time_round2 = time.time()
     milliseconds_round2 = (end_time_round2 - start_time_round2) * 1000
-    print("Running time of Round 2 =", milliseconds_round2, "ms")
+    print("Running time of MRFFT Round 2 =", milliseconds_round2, "ms")
 
     # Broadcast centers for Round 3
     centers_broadcast = sc.broadcast(centers)
@@ -102,7 +102,7 @@ def MRFFT(inputPoints, K):
     R = inputPoints.map(lambda x: min([math.dist(x, c) for c in centers_value])).reduce(max)
     end_time_round3 = time.time()
     milliseconds_round3 = (end_time_round3 - start_time_round3) * 1000
-    print("Running time of Round 3 =", milliseconds_round3, "ms")
+    print("Running time of MRFFT Round 3 =", milliseconds_round3, "ms")
 
     return R
 
