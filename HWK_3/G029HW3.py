@@ -5,7 +5,6 @@ from pyspark.streaming import StreamingContext
 from pyspark import StorageLevel
 import threading
 import math
-import time
 
 # Reservoir Sampling function
 def reservoir_sampling(items, k, reservoir):
@@ -63,7 +62,7 @@ def process_batch(time, batch, streamLength, n, phi, epsilon, histogram, reservo
 def main():
     # Parse command-line arguments
     if len(sys.argv) != 6:
-        print("Usage: GxxxHW3.py <n> <phi> <epsilon> <delta> <portExp>")
+        print("Usage: G029HW3.py <n> <phi> <epsilon> <delta> <portExp>")
         sys.exit(-1)
 
     n = int(sys.argv[1])
@@ -86,7 +85,8 @@ def main():
     stopping_condition = threading.Event()
 
     # Configure Spark
-    conf = SparkConf().setMaster("local[*]").setAppName("GxxxHW3")
+    conf = SparkConf().setMaster("local[*]").setAppName("G029HW3")
+    conf = conf.set("spark.executor.memory", "4g").set("spark.driver.memory", "4g")
     sc = SparkContext(conf=conf)
     ssc = StreamingContext(sc, 0.01)  # Batch duration of 0.01 seconds
     ssc.sparkContext.setLogLevel("ERROR")
@@ -129,11 +129,13 @@ def main():
     true_frequent_items.sort()
 
     # Print the results
-    print(f"Input parameters: n={n}, phi={phi}, epsilon={epsilon}, delta={delta}, portExp={portExp}")
+    print(f"INPUT PROPERTIES")
+    print(f"n = {n} phi = {phi} epsilon = {epsilon} delta = {delta} port = {portExp}")
 
     # Exact Algorithm Results
-    print(f"Size of the data structure used to compute the true frequent items: {len(histogram)}")
-    print(f"Number of true frequent items: {len(true_frequent_items)}")
+    print("EXACT ALGORITHM")
+    print(f"Number of items in the data structure = {len(histogram)}")
+    print(f"Number of true frequent items = {len(true_frequent_items)}")
     print("True frequent items:")
     for item in true_frequent_items:
         print(item)
@@ -141,9 +143,10 @@ def main():
     # Reservoir Sampling Results
     reservoir.sort()
     estimated_frequent_items = sorted(set(reservoir))
-    print(f"Size m of the Reservoir sample: {m}")
-    print(f"Number of estimated frequent items: {len(estimated_frequent_items)}")
-    print("Estimated frequent items (Reservoir Sampling):")
+    print("RESERVOIR SAMPLING")
+    print(f"Size m of the sample = {m}")
+    print(f"Number of estimated frequent items = {len(estimated_frequent_items)}")
+    print("Estimated frequent items:")
     for item in estimated_frequent_items:
         if item in true_frequent_items:
             print(f"{item} +")
@@ -151,10 +154,11 @@ def main():
             print(f"{item} -")
 
     # Sticky Sampling Results
-    print(f"Size of the Hash Table: {len(sticky_frequency_map)}")
+    print("STICKY SAMPLING")
+    print(f"Number of items in the Hash Table = {len(sticky_frequency_map)}")
     approx_frequent_items = sorted(sticky_frequency_map.keys())
-    print(f"Number of estimated frequent items (Sticky Sampling): {len(approx_frequent_items)}")
-    print("Epsilon-Approximate Frequent Items (Sticky Sampling):")
+    print(f"Number of estimated frequent items = {len(approx_frequent_items)}")
+    print("Estimated frequent items:")
     for item in approx_frequent_items:
         if item in true_frequent_items:
             print(f"{item} +")
