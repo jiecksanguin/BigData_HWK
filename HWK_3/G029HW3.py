@@ -19,29 +19,35 @@ def reservoir_sampling(items, k, reservoir):
                 reservoir[s] = item
 
 # Sticky Sampling function
-def sticky_sampling(items, epsilon, sticky_frequency_map):
-    sample_threshold = int(1 / epsilon)
+def sticky_sampling(items, n, r, sticky_frequency_map):
+    sample_probability = r / n
     for item in items:
         if item in sticky_frequency_map:
             sticky_frequency_map[item] += 1
-        elif len(sticky_frequency_map) < sample_threshold:
-            sticky_frequency_map[item] = 1
         else:
-            for key in list(sticky_frequency_map.keys()):
-                sticky_frequency_map[key] -= 1
-                if sticky_frequency_map[key] == 0:
-                    del sticky_frequency_map[key]
+            if random.random() < sample_probability:
+                sticky_frequency_map[item] = 1
 
 # Operations to perform after receiving an RDD 'batch' at time 'time'
-def process_batch(time, batch, streamLength, n, phi, epsilon, histogram, reservoir, sticky_frequency_map, stopping_condition):
+def process_batch(time, batch, streamLength, n, m, r, histogram, reservoir, sticky_frequency_map, stopping_condition): 
+    # Get the size of the current batch
     batch_size = batch.count()
-    # If we already have enough points (> n), skip this batch.
-    if streamLength[0] >= n:
-        return
-    streamLength[0] += batch_size
+    # Calculate the remaining number of items to process to reach n
+    remaining_items = n - streamLength[0]
     
-    # Extract items from the batch
-    batch_items = batch.map(lambda s: int(s)).collect()
+    # If the required number of items has already been processed, skip this batch
+    if remaining_items <= 0:
+        return
+    
+    # If the current batch size exceeds the remaining number of items, take only the necessary items
+    if batch_size > remaining_items:
+        batch_items = batch.map(lambda s: int(s)).take(remaining_items)
+    else:
+        batch_items = batch.map(lambda s: int(s)).collect()
+
+    # Update the stream length with the number of processed items
+    processed_count = len(batch_items)
+    streamLength[0] += processed_count
 
     # Update the histogram for true frequent items
     for item in batch_items:
@@ -54,7 +60,7 @@ def process_batch(time, batch, streamLength, n, phi, epsilon, histogram, reservo
     reservoir_sampling(batch_items, m, reservoir)
 
     # Apply Sticky Sampling
-    sticky_sampling(batch_items, epsilon, sticky_frequency_map)
+    sticky_sampling(batch_items, n, r, sticky_frequency_map)
 
     if streamLength[0] >= n:
         stopping_condition.set()
@@ -72,8 +78,10 @@ def main():
     portExp = int(sys.argv[5])
 
     # Constants for reservoir sampling
-    global m
     m = math.ceil(1 / phi)
+
+    # Calculate the sampling rate r
+    r = math.log(1 / (delta * phi)) / epsilon
 
     # Data structures to maintain the state
     streamLength = [0]  # Stream length (an array to be passed by reference)
@@ -94,35 +102,16 @@ def main():
     # Create DStream from the specified socket
     stream = ssc.socketTextStream("algo.dei.unipd.it", portExp, StorageLevel.MEMORY_AND_DISK)
     # Process each batch
-    stream.foreachRDD(lambda time, batch: process_batch(time, batch, streamLength, n, phi, epsilon, histogram, reservoir, sticky_frequency_map, stopping_condition))
+    stream.foreachRDD(lambda time, batch: process_batch(time, batch, streamLength, n, m, r, histogram, reservoir, sticky_frequency_map, stopping_condition))
 
-    # Start the streaming context in a separate thread
-    def start_streaming():
-        try:
-            ssc.start()
-            ssc.awaitTermination()
-        except Exception as e:
-            print(f"Error in streaming context: {e}")
-
-    streaming_thread = threading.Thread(target=start_streaming)
-    streaming_thread.start()
+    # Start the streaming context
+    ssc.start()
 
     # Wait for the stopping condition to be set
     stopping_condition.wait()
     
-    # Try to stop the streaming context gracefully
-    def stop_streaming():
-        try:
-            ssc.stop(False, True)
-        except Exception as e:
-            print(f"Error stopping streaming context: {e}")
-
-    stop_streaming_thread = threading.Thread(target=stop_streaming)
-    stop_streaming_thread.start()
-    stop_streaming_thread.join()
-
-    # Ensure the streaming thread completes
-    streaming_thread.join()
+    # Stop the streaming context gracefully
+    ssc.stop(False, True)
 
     # Compute true frequent items
     true_frequent_items = [item for item, count in histogram.items() if count >= phi * streamLength[0]]
@@ -156,7 +145,8 @@ def main():
     # Sticky Sampling Results
     print("STICKY SAMPLING")
     print(f"Number of items in the Hash Table = {len(sticky_frequency_map)}")
-    approx_frequent_items = sorted(sticky_frequency_map.keys())
+    approx_frequent_items = [item for item, count in sticky_frequency_map.items() if count >= (phi - epsilon) * streamLength[0]]
+    approx_frequent_items.sort()
     print(f"Number of estimated frequent items = {len(approx_frequent_items)}")
     print("Estimated frequent items:")
     for item in approx_frequent_items:
